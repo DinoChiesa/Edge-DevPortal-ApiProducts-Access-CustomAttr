@@ -4,18 +4,24 @@ This module provides Role-Based Access control to API Products for users in the 
 Edge Drupal-based developer portal. It examines the custom attribute "role-access" on the API Product,
 and includes the product in the list displayed to a user that has  any of the roles in that list. 
 
-## Example:
+## Example Behavior
 
-Given these facts:
+Given this configuration:
 
 * Product1 has custom attribute: name:"roles-access", value:"gold-partner, silver-partner"
-* Product2 has custom attribute: name:"roles-access", value:"foo"
+* Product2 has custom attribute: name:"roles-access", value:"partner100"
 * Product3 has no custom attribute.
-* user1 has role: "authenticated user, gold-partner"
+* the "default" roles configured for this module are: "administrator"
+* user1 has roles: "authenticated user, gold-partner"
 * user2 has role: "authenticated user"
+* admin has roles: "authenticated user, administrator"
 
-When user1 logs into the devportal, he will see Product1 in the list.  He will not see Product2 or Product3
-When user2 logs into the devportal, he will see no products in the list.
+Operational results:
+
+* When user1 logs into the devportal, he will see Product1 in the list.  He will not see Product2 or Product3.
+* When user2 logs into the devportal, she will see no products in the list.
+* When admin logs into the devportal, he can see Product3!
+
 
 
 ## Related modules
@@ -38,26 +44,33 @@ sites/all/modules/custom/apiproduct_access_customattr
 Then enable the module as normal,
 in the Drupal Module administration panel.
 
-## Configuring
 
-To configure the access and roles, login as Administrator, and then use Configuration >
-Dev Portal > API Product Role Access - Custom Attribute .  The interface should be mostly
-self-explanatory from there.
+## Notes on Configuration
 
-The set of checkboxes allows you to specify a set of roles that will have access
-to any API Product that does not have the custom attribute set. This is the "default set of roles" that will apply to an
-API Product unless and until you explicitly provide roles for that product, in the custom attribute.
+To configure the access and roles, login as Administrator, and then use
+Configuration > Dev Portal > API Product Role Access - Custom Attribute.
+The settings are simple and the interface will be self-explanatory.
 
-For example, if you want no users to be able to see any API Product until you explicitly
-specify roles for the product (in the custom attribute), tick no boxes under "Default roles".
+The first set of checkboxes allows you to specify a set of roles that will
+have access to any API Product that does not have the custom attribute
+set. This is the "default set of roles" that will apply to an API
+Product unless and until you explicitly provide roles for that product,
+in the custom attribute called "roles-access".
 
-At any point in time an administrator can modify the roles that will have access to a specific existing API Product.
+If you want API Products to _not_ be visible by any user unless the
+roles-access attribute is set, then uncheck all of those boxes.
 
 
-## Compatibility
+The second set of checkboxes allows you to specify a set of roles that
+will have access to any API Product, regardless of the presence or value
+of the custom attribute. This should probably be set to "administrator"
+only.
 
-Do not use this module with the original devconnect apiproduct access module, or the extended version.
-It does not make much sense to do so. If you use this module, you should not install the others, or you should disable them.
+At any point in time an administrator can modify the roles-access
+attribute on any API Product. This setting will be cached by Drupal, so
+in a demonstration scenario, be sure to clear the drupal cache, or turn
+off caching for API products.
+
 
 ## Disclaimer
 

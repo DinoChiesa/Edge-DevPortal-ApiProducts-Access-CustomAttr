@@ -31,45 +31,49 @@ function apiproduct_access_customattr_user_role_load($rid) {
   }
   return NULL;
 }
-  
-function apiproduct_access_customattr_get_default_roles() {
+
+function apiproduct_access_customattr_get_roles_in_category($category) {
   $prefix = apiproduct_access_customattr_modulename();
-  $want_logging = variable_get($prefix . '_logging', 0);  
-  $varname = $prefix . '_defaultroles';
-  $default_roles = variable_get($varname, FALSE);
-  if ($default_roles === FALSE) {
-    $default_roles = array(DRUPAL_AUTHENTICATED_RID => DRUPAL_AUTHENTICATED_RID);
+  $want_logging = variable_get($prefix . '_logging', 0);
+  $varname_suffix = '_' . $category . 'roles'; // _defaultroles , _seeallroles
+  $varname = $prefix . $varname_suffix;
+  $the_roles = variable_get($varname, FALSE);
+  if ($the_roles === FALSE) {
+    $the_roles = array(DRUPAL_AUTHENTICATED_RID => DRUPAL_AUTHENTICATED_RID);
     if ($want_logging) {
       watchdog($prefix,
-               "RBAC default roles assigned: !defaultroles", array('!defaultroles' => print_r($default_roles, TRUE)),
+               "RBAC !label roles assigned: !roles", array('!label' => $category, '!roles' => print_r($the_roles, TRUE)),
                WATCHDOG_NOTICE);
     }
   }
-  else if (is_string($default_roles)) {
-    $default_roles = explode(',', $default_roles);
+  else if (is_string($the_roles)) {
+    $the_roles = explode(',', $the_roles);
     if ($want_logging) {
       watchdog($prefix,
-               "RBAC default role ids read: !defaultroles", array('!defaultroles' => print_r($default_roles, TRUE)),
+               "RBAC !label role ids read: !roles", array('!label' => $category, '!roles' => print_r($the_roles, TRUE)),
                WATCHDOG_NOTICE);
     }
   }
 
-  if ($default_roles) {
-    $default_roles = array_map($prefix . "_user_role_load", $default_roles);    
+  if ($the_roles) {
+    $the_roles = array_map($prefix . "_user_role_load", $the_roles);
     if ($want_logging) {
       watchdog($prefix,
-               "RBAC default rolenames: !defaultroles", array('!defaultroles' => print_r($default_roles, TRUE)),
+               "RBAC !label rolenames: !roles", array('!label' => $category,
+                                                             '!roles' => print_r($the_roles, TRUE)),
                WATCHDOG_NOTICE);
     }
   }
   else if ($want_logging) {
     watchdog($prefix,
-             "RBAC somehow there are no default roles?", array(),
+             "RBAC somehow there are no !label roles?", array('!label' => $category),
              WATCHDOG_NOTICE);
   }
 
-  return $default_roles;
+  return $the_roles;
 }
+
+
 
 /**
  * Implements hook_apiproduct_list_alter().
@@ -84,12 +88,15 @@ function apiproduct_access_customattr_apiproduct_list_alter(array &$api_products
     if ($want_logging) {
       watchdog($prefix, "RBAC enabled, account roles: !roles", array("!roles" => print_r($account->roles, TRUE)), WATCHDOG_NOTICE);
     }
-    // $account->roles is like this: 
+    // $account->roles is like this:
     // Array ( [2] => authenticated user [4] => gold-partner )
 
     // default roles will apply when no custom attribute is present on the API Product
-    $default_roles = apiproduct_access_customattr_get_default_roles();
-    
+    $default_roles = apiproduct_access_customattr_get_roles_in_category('default');
+
+    // seeall roles will always see the API Product, regardless of the custom attribute
+    $seeall_roles = apiproduct_access_customattr_get_roles_in_category('seeall');
+
     //$user_roles = user_roles(TRUE);
     foreach ($api_products as $id => $product) {
       $access_enabled = FALSE;
@@ -98,64 +105,84 @@ function apiproduct_access_customattr_apiproduct_list_alter(array &$api_products
                  "Product: !product", array('!product' => print_r($product, TRUE)),
                  WATCHDOG_NOTICE);
       }
-      $roles_for_product = NULL;
-      if (array_key_exists ( "roles-access", $product->attributes )) {
-        $roles_for_product = $product->attributes["roles-access"];
-      }
-  
-      if (is_string($roles_for_product)) {
-        // use the rolenames listed in the custom attribute
-        if ($want_logging) {
-          watchdog($prefix,
-                   "p:!productname using stored roles: !roles",
-                   array('!productname' => $product->name, '!roles' => $roles_for_product),
-                   WATCHDOG_NOTICE);
-        }
-        $roles_for_product = explode(',', $roles_for_product);
-        $roles_for_product = array_map('trim', $roles_for_product);
-      }
-      else if (is_array($default_roles)) {
-        // use the default roles 
-        if ($want_logging) {
-          watchdog($prefix,
-                   "p:!productname using default roles", array('!productname' => $product->name),
-                   WATCHDOG_NOTICE);
-        }
-        $roles_for_product = $default_roles;
-      }
 
-      if (is_array($roles_for_product)) {
+      // check if the user has "see all" rights 
+      if (is_array($seeall_roles)) {
         foreach ($account->roles as $rid => $user_role_name) {
-          if (in_array ( $user_role_name, $roles_for_product)) {
+          if (in_array ( $user_role_name, $seeall_roles)) {
             if ($want_logging) {
               watchdog($prefix,
-                       "check p:!productname userrole:!userrole YES", array('!productname' => $product->name,
-                                                                            '!userrole' => $user_role_name),
+                       "seeall p:!productname userrole:!userrole YES", array('!productname' => $product->name,
+                                                                             '!userrole' => $user_role_name),
                        WATCHDOG_NOTICE);
             }
             $access_enabled = TRUE;
           }
-          else if ($want_logging) {
-            watchdog($prefix,
-                     "check p:!productname userrole:!userrole NO", array('!productname' => $product->name,
-                                                                         '!userrole' => $user_role_name),
-                     WATCHDOG_NOTICE);
-          }
         }
       }
-      else if ($want_logging) {
-        watchdog($prefix,
-                 "p:!productname neither explicit nor default roles available", array('!productname' => $product->name),
-                 WATCHDOG_NOTICE);
+
+      // ok, if the user doesn't have "see all" rights, then check the custom attr
+      if (! $access_enabled) {
+        $roles_for_product = NULL;
+        if (array_key_exists ( "roles-access", $product->attributes )) {
+          $roles_for_product = $product->attributes["roles-access"];
+        }
+
+        if (is_string($roles_for_product)) {
+          // use the rolenames listed in the custom attribute
+          if ($want_logging) {
+            watchdog($prefix,
+                     "p:!productname using stored roles: !roles",
+                     array('!productname' => $product->name, '!roles' => $roles_for_product),
+                     WATCHDOG_NOTICE);
+          }
+          $roles_for_product = explode(',', $roles_for_product);
+          $roles_for_product = array_map('trim', $roles_for_product);
+        }
+        else if (is_array($default_roles)) {
+          // use the default roles
+          if ($want_logging) {
+            watchdog($prefix,
+                     "p:!productname using default roles", array('!productname' => $product->name),
+                     WATCHDOG_NOTICE);
+          }
+          $roles_for_product = $default_roles;
+        }
+
+        if (is_array($roles_for_product)) {
+          foreach ($account->roles as $rid => $user_role_name) {
+            if (in_array ( $user_role_name, $roles_for_product)) {
+              if ($want_logging) {
+                watchdog($prefix,
+                         "check p:!productname userrole:!userrole YES", array('!productname' => $product->name,
+                                                                              '!userrole' => $user_role_name),
+                         WATCHDOG_NOTICE);
+              }
+              $access_enabled = TRUE;
+            }
+            else if ($want_logging) {
+              watchdog($prefix,
+                       "check p:!productname userrole:!userrole NO", array('!productname' => $product->name,
+                                                                           '!userrole' => $user_role_name),
+                       WATCHDOG_NOTICE);
+            }
+          }
+        }
+        else if ($want_logging) {
+          watchdog($prefix,
+                   "p:!productname neither explicit nor default roles available", array('!productname' => $product->name),
+                   WATCHDOG_NOTICE);
+        }
       }
-      
+
+      // actually apply the filter
       if (!$access_enabled) {
         unset($api_products[$id]);
         if ($want_logging) {
           watchdog($prefix,
                    "p:!productname disallowed", array('!productname' => $product->name),
                    WATCHDOG_NOTICE);
-        }        
+        }
       }
       else if ($want_logging) {
         watchdog($prefix,
@@ -206,7 +233,6 @@ function apiproduct_access_customattr_admin_form($form, &$form_state) {
   }
 
   $tprefix = '';
-  //$tsuffix = '<div class=\'' . $prefix  . '\'>' . 'The custom attribute is: roles-acess.</div>';
   $tsuffix = '';
   $form[$prefix][$varname] = array(
        '#type' => 'checkboxes',
@@ -215,6 +241,26 @@ function apiproduct_access_customattr_admin_form($form, &$form_state) {
        '#suffix' => $tsuffix,
        '#options' => $roles,
        '#default_value' => $default_roles,
+     );
+
+  $varname = $prefix . '_seeallroles';
+  $seeall_roles = variable_get($varname, FALSE);
+  if ($seeall_roles === FALSE) {
+    $seeall_roles = array(); // no roles get "see all" by default
+  }
+  else if (is_string($seeall_roles)) {
+    $seeall_roles = explode(',', $seeall_roles);
+  }
+
+  $tprefix = '';
+  $tsuffix = '';
+  $form[$prefix][$varname] = array(
+       '#type' => 'checkboxes',
+       '#title' => t('Roles that will always see API products, regardless of the custom attribute:'),
+       '#prefix' => $tprefix,
+       '#suffix' => $tsuffix,
+       '#options' => $roles,
+       '#default_value' => $seeall_roles,
      );
 
   // want logging of module activities?
@@ -227,7 +273,7 @@ function apiproduct_access_customattr_admin_form($form, &$form_state) {
           '#required' => TRUE,
           '#default_value' => variable_get($prefix . '_logging', 0)
           );
-  
+
   $form = system_settings_form($form);
   $submit_handler_function_name = apiproduct_access_customattr_modulename() . '_admin_form_submit';
   array_unshift($form['#submit'], $submit_handler_function_name);
