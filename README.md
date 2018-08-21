@@ -2,17 +2,31 @@
 
 This module provides Role-Based Access control to API Products for users in the Apigee
 Edge Drupal-based developer portal. It examines the custom attribute "role-access" on the API Product,
-and includes the product in the list displayed to a user with any of the listed roles.
+and includes the product in the list displayed to a user that has  any of the roles in that list. 
+
+## Example:
+
+Given these facts:
+
+* Product1 has custom attribute: name:"roles-access", value:"gold-partner, silver-partner"
+* Product2 has custom attribute: name:"roles-access", value:"foo"
+* Product3 has no custom attribute.
+* user1 has role: "authenticated user, gold-partner"
+* user2 has role: "authenticated user"
+
+When user1 logs into the devportal, he will see Product1 in the list.  He will not see Product2 or Product3
+When user2 logs into the devportal, he will see no products in the list.
+
 
 ## Related modules
 
-* API Product access control
+* devconnect API Product access control - the default access control. An alternative to this module.
+* [API Product access control (Extended)](https://github.com/DinoChiesa/Edge-DevPortal-ApiProducts-Access-Extended) - an alternative module in which the Drupal admin specifies which products can be seen by which roles.
+* [API Product Access by Role](https://github.com/DinoChiesa/Edge-DevPortal-Filter-ApiProducts-ByRole) - not sure of the function here.
+* [Filter-ApiProducts by Environment](https://github.com/DinoChiesa/Edge-DevPortal-Filter-ApiProducts) - filters products by Pantheon environment (dev, stage, live). Possibly complementary to this module.
+* [ApiProducts-GroupBy-Env](https://github.com/DinoChiesa/Edge-DevPortal-ApiProducts-GroupBy-Env) - a module that groups Products by Environment in the dropdown list.  _Complementary_ to this module.
 
-* API Product access control (Extended)
-
-
-Neither of the above modules should be used with this module. They are alternatives.
-Both of the above allow the Drupal admin to explicitly configure access control in the portal itself. This module is different in that it infers access based on information in the custom attributes of the API Product.
+This module is different in that it infers access based on information stored on a custom attribute of the API Product.
 
 
 ## Installing
