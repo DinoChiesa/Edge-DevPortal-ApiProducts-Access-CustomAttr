@@ -1,0 +1,10 @@
+name = DevConnect API Product Filtering by Custom Attr and User Role
+description = Allows API Products to be limited by Drupal role, depending on a custom attr on the API Product.
+core = 7.x
+package = Dev Portal - Extensions
+php = 5.3
+version = 7.x-4.3
+
+dependencies[] = devconnect_developer_apps
+
+configure = admin/config/devconnect/apiproduct-access-customattr

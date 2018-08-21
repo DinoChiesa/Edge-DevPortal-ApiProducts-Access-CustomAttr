@@ -1,0 +1,196 @@
+<?php
+
+/**
+ * @file
+ * Main module file.
+ */
+
+function apiproduct_access_customattr_modulename() {
+  $module_name = basename(__FILE__, '.module');
+  return $module_name;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function apiproduct_access_customattr_menu() {
+  $items['admin/config/devconnect/apiproduct-access-customattr'] = array(
+    'title' => 'API Product Role Access Custom Attr',
+    'description' => 'Settings controlling role-based access to API Products based on custom attribute.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('apiproduct_access_customattr_admin_form'),
+    'access arguments' => array('administer organization settings'),
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_apiproduct_list_alter().
+ *
+ * Checks RBAC access for given API Products.
+ */
+function apiproduct_access_customattr_apiproduct_list_alter(array &$api_products, stdClass $account) {
+  $prefix = apiproduct_access_customattr_modulename();
+  $varname = $prefix . '_enabled';
+  if (variable_get($varname, 0)) {
+    watchdog($prefix, "RBAC enabled, accountroles: !roles", array("!roles" => print_r($account->roles, TRUE)), WATCHDOG_NOTICE);
+    $account_roles = array_keys($account->roles);
+
+    // default roles will apply when no custom attribute is present on the API Product
+    $varname = $prefix . '_defaultroles';
+    $default_roles = variable_get($varname, FALSE);
+    if ($default_roles === FALSE) {
+      $default_roles = array(DRUPAL_AUTHENTICATED_RID => DRUPAL_AUTHENTICATED_RID);
+      // watchdog($prefix,
+      //          "RBAC default roles defaulted: !defaultroles", array('!defaultroles' => print_r($default_roles, TRUE)),
+      //          WATCHDOG_NOTICE);
+    }
+    else if (is_string($default_roles)) {
+      $default_roles = explode(',', $default_roles);
+      // watchdog($prefix,
+      //          "RBAC default roles exploded: !defaultroles", array('!defaultroles' => print_r($default_roles, TRUE)),
+      //          WATCHDOG_NOTICE);
+    }
+    // else {
+    //   watchdog($prefix,
+    //            "RBAC default roles read: !defaultroles", array('!defaultroles' => print_r($default_roles, TRUE)),
+    //            WATCHDOG_NOTICE);
+    // }
+
+    $user_roles = user_roles(TRUE);
+    foreach ($api_products as $id => $product) {
+      $access_enabled = FALSE;
+      watchdog($prefix,
+               "Product: !product", array('!product' => print_r($product, TRUE)),
+               WATCHDOG_NOTICE);
+      
+      $roles_for_product = $product->attributes["roles-access"];
+      if (is_string($roles_for_product)) {
+        // use the roles listed in the custom attribute
+        watchdog($prefix,
+                 "p:!productname using stored roles: !roles",
+                 array('!productname' => $product->name, '!roles' => $roles_for_product),
+                 WATCHDOG_NOTICE);
+        $roles_for_product = explode(',', $roles_for_product);
+      }
+      else if (is_array($default_roles)) {
+        // use the default roles 
+        watchdog($prefix,
+                 "p:!productname using default roles", array('!productname' => $product->name),
+                 WATCHDOG_NOTICE);
+        $roles_for_product = $default_roles;
+      }
+
+      
+      if (is_array($roles_for_product)) {
+        foreach ($user_roles as $rid => $user_role_name) {
+          if (in_array ( $user_role_name, $roles_for_product)) {
+            $access_enabled = TRUE;
+          }
+        }
+      }
+      else {
+        watchdog($prefix,
+                 "p:!productname neither explicit nor default roles available", array('!productname' => $product->name),
+                 WATCHDOG_NOTICE);
+      }
+      
+      if (!$access_enabled) {
+        unset($api_products[$id]);
+        watchdog($prefix,
+                 "p:!productname disallowed", array('!productname' => $product->name),
+                 WATCHDOG_NOTICE);
+      }
+      else {
+        watchdog($prefix,
+                 "p:!productname allowed", array('!productname' => $product->name),
+                 WATCHDOG_NOTICE);
+      }
+    }
+  }
+  else {
+    watchdog($prefix, "access control disabled", array("foo" => "bar"), WATCHDOG_NOTICE);
+  }
+}
+
+
+/**
+ * Creates the admin form for this module.
+ */
+function apiproduct_access_customattr_admin_form($form, &$form_state) {
+  $prefix = apiproduct_access_customattr_modulename();
+
+  $roles = user_roles(TRUE);
+  $roles[DRUPAL_AUTHENTICATED_RID] = t('All logged-in developers');
+  $num_roles = count($roles);
+
+  $api_products = entity_load('api_product');
+  $num_products = count($api_products);
+
+  $tprefix = '<div class=\'' . $prefix  . '\'>';
+  $tsuffix = '';
+  $varname = $prefix . '_enabled';
+  $fld_attributes = array('title' => t('This is the master switch for the role access check'));
+  if (variable_get($varname, 0)) {
+    $fld_attributes['checked'] = 'checked';
+  }
+  $form[$prefix][$varname] = array('#type'=>'checkbox',
+                                   '#title'=>t('Access check enabled'),
+                                   '#prefix' => $tprefix,
+                                   '#suffix' => $tsuffix,
+                                   '#attributes' => $fld_attributes );
+
+  $varname = $prefix . '_defaultroles';
+  $default_roles = variable_get($varname, FALSE);
+  if ($default_roles === FALSE) {
+    $default_roles = array( 0 => DRUPAL_AUTHENTICATED_RID);
+  }
+  else if (is_string($default_roles)) {
+    $default_roles = explode(',', $default_roles);
+  }
+
+  $tprefix = '';
+  $tsuffix = '';
+  $form[$prefix][$varname] = array(
+       '#type' => 'checkboxes',
+       '#title' => t('Default roles for API products lacking the custom attribute'),
+       '#prefix' => $tprefix,
+       '#suffix' => $tsuffix,
+       '#options' => $roles,
+       '#default_value' => $default_roles,
+     );
+
+  $form = system_settings_form($form);
+  $submit_handler_function_name = apiproduct_access_customattr_modulename() . '_admin_form_submit';
+  array_unshift($form['#submit'], $submit_handler_function_name);
+  return $form;
+}
+
+function apiproduct_access_customattr_endsWith($haystack, $needle) {
+    $length = strlen($needle);
+    return $length === 0 || (substr($haystack, -$length) === $needle);
+}
+
+/**
+ * Cleans up messy arrays generated by 'checkboxes' element.
+ *
+ * The checkbox array will have a value of zero for unchecked items, and have
+ * the key value for checked items, for example: [2=>2, 3=>3, 4=>0].
+ *
+ * This function changes the array to save as just the values selected, for
+ * the example above it will change to: [2,3].
+ */
+function apiproduct_access_customattr_admin_form_submit($form, &$form_state) {
+  $prefix = apiproduct_access_customattr_modulename();
+  foreach ($form_state['values'] as $key => $val) {
+    if (apiproduct_access_customattr_endsWith($key, '_defaultroles')) {
+      $transformed_array = array();
+      foreach ($val as $item => $value) {
+        if ($value) {
+          $transformed_array[] = $item;
+        }
+      }
+      $form_state['values'][$key] = implode(',', $transformed_array);
+    }
+  }
+}
