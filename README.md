@@ -51,6 +51,8 @@ To configure the access and roles, login as Administrator, and then use
 Configuration > Dev Portal > API Product Role Access - Custom Attribute.
 The settings are simple and the interface will be self-explanatory.
 
+![admin config panel](images/screenshot-20180821-173741.png "Admin Panel Snap 1")
+
 The first set of checkboxes allows you to specify a set of roles that will
 have access to any API Product that does not have the custom attribute
 set. This is the "default set of roles" that will apply to an API
