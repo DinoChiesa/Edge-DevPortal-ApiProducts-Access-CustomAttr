@@ -2,7 +2,7 @@
 
 This module provides Role-Based Access control to API Products for users in the Apigee
 Edge Drupal-based developer portal. It examines the custom attribute "role-access" on the API Product,
-and includes the product in the list displayed to a user that has  any of the roles in that list. 
+and includes the product in the list displayed to a user that has  any of the roles in that list.
 
 ## Example Behavior
 
@@ -28,7 +28,7 @@ Operational results:
 
 * devconnect API Product access control - the default access control. An alternative to this module.
 * [API Product access control (Extended)](https://github.com/DinoChiesa/Edge-DevPortal-ApiProducts-Access-Extended) - an alternative module in which the Drupal admin specifies which products can be seen by which roles.
-* [API Product Access by Role](https://github.com/DinoChiesa/Edge-DevPortal-Filter-ApiProducts-ByRole) - not sure of the function here.
+* [API Product Access by Role](https://github.com/DinoChiesa/Edge-DevPortal-Filter-ApiProducts-ByRole) - allows corse filtering based on environment, and user roles. Does not filter by API Product.
 * [Filter-ApiProducts by Environment](https://github.com/DinoChiesa/Edge-DevPortal-Filter-ApiProducts) - filters products by Pantheon environment (dev, stage, live). Possibly complementary to this module.
 * [ApiProducts-GroupBy-Env](https://github.com/DinoChiesa/Edge-DevPortal-ApiProducts-GroupBy-Env) - a module that groups Products by Environment in the dropdown list.  _Complementary_ to this module.
 
